@@ -69,7 +69,7 @@ This demo focuses on clarity and replicability, keeping the implementation light
     ├── consumer.py      # gRPC service implementation
     ├── main.py          # Server entrypoint
     ├── requirements.txt # Server dependencies
-    └── worker.py        # Worker logic and throttling behavior
+    └── processor.py        # dummy message processor
 ```
 
 ---
