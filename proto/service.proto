@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package grpc.service;
+
+import "data_model.proto";
+
+message StreamResonse {
+    bool success = 1;
+    int32 message_received = 2;
+    int32 message_dropped = 3;
+    string message = 4;
+}
+
+service ConsumerService {
+    rpc StreamWork(stream WorkItem) returns (StreamResonse); // client streaming - The client opens a stream to the server and begins sending multiple request messages sequentially.
+}
