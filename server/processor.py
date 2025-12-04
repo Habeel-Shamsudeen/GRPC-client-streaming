@@ -14,7 +14,7 @@ async def process_message(batch : list[WorkItem]):
             "payload" : message.payload
         }
         down_stream_data.append(data)
-        await asyncio.sleep(0.05) # can be transformation, db call etc
+        await asyncio.sleep(0.1) # can be transformation, db call etc
     
     # simulate sending the transformed message downstream
     asyncio.create_task(send_downstream(down_stream_data))
@@ -24,4 +24,4 @@ async def process_message(batch : list[WorkItem]):
 
 async def send_downstream(data):
     # simulate sending data to downstream services or kafka
-    await asyncio.sleep(0.3)
+    await asyncio.sleep(0.5)

@@ -53,7 +53,7 @@ def get_random_data() -> WorkItem:
     username = random.choice(DUMMY_USERNAMES)
     payload = random.choice(DUMMY_PAYLOADS)
     status = random.choice(STATUS_OPTIONS)
-    priority = random.choice([True, False])
+    priority = random.random() < 0.3
     
     timestamp = create_timestamp(datetime.now())
     

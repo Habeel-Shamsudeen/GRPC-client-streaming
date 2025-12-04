@@ -5,7 +5,9 @@ from client.client import grpc_client
 from client.data import get_random_data
 import grpc
 
-MAX_MESSAGES = 300
+
+MAX_MESSAGES = 1000
+SEND_INTERVAL = 0.001
 
 async def start_producer():
     logging.info("Starting Producer")
@@ -16,7 +18,7 @@ async def start_producer():
             responses = await grpc_client.cleanup()
             break
         data = get_random_data()
-        await asyncio.sleep(0.005)
+        await asyncio.sleep(SEND_INTERVAL)
         uploaded = await upload_to_stream(data)
         if uploaded:
             messages_sent += 1

@@ -9,9 +9,9 @@ from server.processor import process_message
 class ConsumerService(service_pb2_grpc.ConsumerServiceServicer):
     def __init__(self):
         self.background_tasks = set()
-        self.max_concurrent_tasks = 10
-        self.priority_queue = asyncio.Queue(maxsize=25)
-        self.normal_queue = asyncio.Queue(maxsize=40)
+        self.max_concurrent_tasks = 5
+        self.priority_queue = asyncio.Queue(maxsize=15)
+        self.normal_queue = asyncio.Queue(maxsize=25)
 
     async def StreamWork(self, request_iterator, context):
         message_received = 0
@@ -25,9 +25,18 @@ class ConsumerService(service_pb2_grpc.ConsumerServiceServicer):
                     self.normal_queue.put_nowait(message)
                 message_received += 1
             except asyncio.QueueFull:
-                logging.warning("Scrape queue is full — dropping message")
+                queue_name = "priority" if message.priority else "normal"
+                queue_size = self.priority_queue.qsize() if message.priority else self.normal_queue.qsize()
+                logging.warning(f"{queue_name} queue FULL (size: {queue_size}) - dropping message {message.id[:8]}...")
                 message_dropped += 1
 
+        if message_dropped > 0:
+            logging.warning(f"Stream Summary: {message_received} received, {message_dropped} DROPPED "
+                          f"(Priority queue: {self.priority_queue.qsize()}, Normal queue: {self.normal_queue.qsize()})")
+        else:
+            logging.info(f"Stream Summary: {message_received} received, {message_dropped} dropped "
+                        f"(Priority queue: {self.priority_queue.qsize()}, Normal queue: {self.normal_queue.qsize()})")
+        
         return StreamResonse(
             success=True,
             message_received=message_received,
@@ -43,15 +52,15 @@ class ConsumerService(service_pb2_grpc.ConsumerServiceServicer):
 
                 # Dynamic batching ( faster batching )
                 if queue_size < 3:
-                    max_batch_size = 30
+                    max_batch_size = 3
                     deadline_seconds = 0.5
                     
                 elif queue_size < 7:
-                    max_batch_size = 7
+                    max_batch_size = 5
                     deadline_seconds = 0.8
                     
                 else:
-                    max_batch_size = 10
+                    max_batch_size = 7
                     deadline_seconds = 1
                 
                 batch = [first_item]
@@ -72,10 +81,12 @@ class ConsumerService(service_pb2_grpc.ConsumerServiceServicer):
                 
                 if batch:
                     if len(self.background_tasks) >= self.max_concurrent_tasks:
-                        logging.warning("Max concurrent tasks reached waiting for event loop free up")
+                        logging.warning(f"MAX CONCURRENT TASKS REACHED ({self.max_concurrent_tasks}) - waiting for task completion. "
+                                      f"Priority queue: {self.priority_queue.qsize()}, "
+                                      f"Normal queue: {self.normal_queue.qsize()}")
                         await asyncio.sleep(0.5)
                     
-                    logging.info(f"Processing {len(batch)} messages")
+                    logging.info(f"Processing {len(batch)} priority messages (active tasks: {len(self.background_tasks)})")
                     task = asyncio.create_task(process_message(batch.copy()))
                     self.background_tasks.add(task)
                     task.add_done_callback(self.background_tasks.discard)
@@ -91,13 +102,13 @@ class ConsumerService(service_pb2_grpc.ConsumerServiceServicer):
                 queue_size = self.normal_queue.qsize()
 
                 # Slower batching
-                if queue_size < 20:
-                    max_batch_size = 20
-                    deadline_seconds = 3
+                if queue_size < 8:
+                    max_batch_size = 5
+                    deadline_seconds = 2
                     
                 else:
-                    max_batch_size = 30
-                    deadline_seconds = 5
+                    max_batch_size = 8
+                    deadline_seconds = 3
                 
                 batch = [first_item]
                 deadline = time.monotonic() + deadline_seconds
@@ -117,10 +128,12 @@ class ConsumerService(service_pb2_grpc.ConsumerServiceServicer):
                 
                 if batch:
                     if len(self.background_tasks) >= self.max_concurrent_tasks:
-                        logging.warning("Max concurrent tasks reached waiting for event loop free up")
+                        logging.warning(f"MAX CONCURRENT TASKS REACHED ({self.max_concurrent_tasks}) - waiting for task completion. "
+                                      f"Priority queue: {self.priority_queue.qsize()}, "
+                                      f"Normal queue: {self.normal_queue.qsize()}")
                         await asyncio.sleep(1)
                     
-                    logging.info(f"Processing {len(batch)} messages")
+                    logging.info(f"Processing {len(batch)} normal messages (active tasks: {len(self.background_tasks)})")
                     task = asyncio.create_task(process_message(batch.copy()))
                     self.background_tasks.add(task)
                     task.add_done_callback(self.background_tasks.discard)
