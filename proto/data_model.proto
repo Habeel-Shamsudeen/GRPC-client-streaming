@@ -3,7 +3,6 @@ syntax = "proto3";
 package grpc.service;
 
 import "google/protobuf/timestamp.proto";
-import "google/protobuf/any.proto";
 
 enum Status {
     NOT_STARTED = 0;
@@ -18,5 +17,4 @@ message WorkItem {
     Status status = 4;
     bool priority = 5;
     google.protobuf.Timestamp timestamp = 6;
-    optional google.protobuf.Any metadata = 7;
 }
