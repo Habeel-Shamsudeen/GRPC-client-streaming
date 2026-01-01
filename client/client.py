@@ -2,9 +2,10 @@ import grpc
 from proto.generated.service_pb2_grpc import ConsumerServiceStub
 import asyncio
 import logging
+import os
 
 class GrpcClient:
-    GRPC_SERVER = "localhost:50051"
+    GRPC_SERVER = os.getenv('GRPC_SERVER', 'localhost:50051')
 
     def __init__(self, pool_size: int = 6):
         self.pool_size = pool_size
