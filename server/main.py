@@ -1,11 +1,14 @@
 import asyncio
 import logging
 from server.consumer import GrpcServer
-
+from server.connections import start_redis_client, start_kafka_producer
 
 logging.basicConfig(level=logging.INFO)
 
 async def main():
+    logging.info("Server starting")
+    redis_client = await start_redis_client()
+    kafka_producer = await start_kafka_producer()
     grpc_server = GrpcServer(
         port=50051,
         no_of_workers=1

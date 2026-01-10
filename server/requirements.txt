@@ -1,2 +1,4 @@
 protobuf>=4.24.0
 grpcio-tools ~= 1.30
+aiokafka==0.11.0
+redis==5.0.1
