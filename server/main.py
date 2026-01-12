@@ -11,7 +11,9 @@ async def main():
     kafka_producer = await start_kafka_producer()
     grpc_server = GrpcServer(
         port=50051,
-        no_of_workers=1
+        no_of_workers=1,
+        redis_client=redis_client,
+        kafka_producer=kafka_producer
     )
     try:
         await grpc_server.start_server()

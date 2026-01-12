@@ -5,13 +5,17 @@ import time
 import proto.generated.service_pb2_grpc as service_pb2_grpc
 from  proto.generated.service_pb2 import StreamResonse
 from server.processor import process_message
+from redis.asyncio import Redis
+from aiokafka import AIOKafkaProducer
 
 class ConsumerService(service_pb2_grpc.ConsumerServiceServicer):
-    def __init__(self):
+    def __init__(self, redis_client:Redis, kafka_producer:AIOKafkaProducer):
         self.background_tasks = set()
         self.max_concurrent_tasks = 5
         self.priority_queue = asyncio.Queue(maxsize=15)
         self.normal_queue = asyncio.Queue(maxsize=25)
+        self.redis_client = redis_client
+        self.kafka_producer = kafka_producer
 
     async def StreamWork(self, request_iterator, context):
         message_received = 0
@@ -87,7 +91,7 @@ class ConsumerService(service_pb2_grpc.ConsumerServiceServicer):
                         await asyncio.sleep(0.5)
                     
                     logging.info(f"Processing {len(batch)} priority messages (active tasks: {len(self.background_tasks)})")
-                    task = asyncio.create_task(process_message(batch.copy()))
+                    task = asyncio.create_task(process_message(batch.copy(), self.redis_client, self.kafka_producer))
                     self.background_tasks.add(task)
                     task.add_done_callback(self.background_tasks.discard)
                     batch.clear()
@@ -134,7 +138,7 @@ class ConsumerService(service_pb2_grpc.ConsumerServiceServicer):
                         await asyncio.sleep(1)
                     
                     logging.info(f"Processing {len(batch)} normal messages (active tasks: {len(self.background_tasks)})")
-                    task = asyncio.create_task(process_message(batch.copy()))
+                    task = asyncio.create_task(process_message(batch.copy(), self.redis_client, self.kafka_producer))
                     self.background_tasks.add(task)
                     task.add_done_callback(self.background_tasks.discard)
                     batch.clear()
@@ -145,14 +149,16 @@ class ConsumerService(service_pb2_grpc.ConsumerServiceServicer):
 
 
 class GrpcServer:
-    def __init__(self, port:int = 50051, no_of_workers:int =1):
+    def __init__(self, port:int = 50051, no_of_workers:int =1, redis_client:Redis = None, kafka_producer:AIOKafkaProducer = None):
         self.port = port
         self.no_of_workers = no_of_workers
         self.server = None
+        self.redis_client = redis_client
+        self.kafka_producer = kafka_producer
 
     async def start_server(self):
         logging.info(f"Starting GRPC server at port {self.port}")
-        consumer_service = ConsumerService()
+        consumer_service = ConsumerService(self.redis_client, self.kafka_producer)
         for i in range(self.no_of_workers):
             asyncio.create_task(consumer_service.priority_worker(),name=f"Priority Worker {i}")
             asyncio.create_task(consumer_service.normal_worker(),name=f"Normal Worker {i}")
